@@ -4,11 +4,11 @@ import {
   CircleDot, Clock3, GitBranch, Link2, Loader2, MessageSquare, Plus, RefreshCw,
   Search, Send, Settings2, UserRound, X,
 } from 'lucide-react';
-import { api, normalizeBoard } from './api.js';
+import { api, buildCreateTaskPayload, normalizeBoard } from './api.js';
 import { STATUSES, statusLabel } from './status.js';
 
 const iconByStatus = { triage: CircleDot, todo: Clock3, scheduled: CalendarClock, ready: ArrowRight, running: Activity, blocked: AlertCircle, review: Search, done: Check };
-const initialForm = { title: '', body: '', assignee: '', priority: 0, workspace_kind: 'dir', workspace_path: '/worktrees/folder-1/vibe-kanban-src', triage: false };
+const initialForm = { title: '', body: '', assignee: '', priority: 0, workspace_kind: 'dir', workspace_path: '/worktrees/folder-1/vibe-kanban-src', parents: [], triage: false };
 const displayTime = (epoch) => epoch ? new Date(epoch * 1000).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 function App() {
@@ -77,7 +77,7 @@ function App() {
   async function createTask(event) {
     event.preventDefault();
     if (!form.title.trim()) return;
-    await mutate(() => api.createTask({ ...form, title: form.title.trim(), priority: Number(form.priority), assignee: form.assignee || null }, boardName), '任务已创建');
+    await mutate(() => api.createTask(buildCreateTaskPayload(form), boardName), '任务已创建');
     setForm(initialForm); setShowCreate(false);
   }
 
@@ -102,7 +102,7 @@ function App() {
       </section>}
     </main>
 
-    {showCreate && <Modal title="新建任务" onClose={() => setShowCreate(false)}><TaskForm form={form} setForm={setForm} profiles={profiles} onSubmit={createTask} onCancel={() => setShowCreate(false)} saving={saving}/></Modal>}
+    {showCreate && <Modal title="新建任务" onClose={() => setShowCreate(false)}><TaskForm form={form} setForm={setForm} profiles={profiles} tasks={tasks} onSubmit={createTask} onCancel={() => setShowCreate(false)} saving={saving}/></Modal>}
     {selectedId && <Drawer detail={detail} log={log} tasks={tasks} profiles={profiles} boardName={boardName} comment={comment} setComment={setComment} linkId={linkId} setLinkId={setLinkId} saving={saving} onClose={closeDrawer} mutate={mutate}/>} 
     {notice && <div className="toast"><Check size={16}/>{notice}</div>}
   </div>;
@@ -122,7 +122,7 @@ function TaskCard({ task, onClick }) {
 
 function Modal({ title, children, onClose }) { return <div className="modal-backdrop" onMouseDown={onClose}><section className="modal" onMouseDown={(e) => e.stopPropagation()}><header><h2>{title}</h2><button onClick={onClose}><X size={19}/></button></header>{children}</section></div>; }
 
-function TaskForm({ form, setForm, profiles, onSubmit, onCancel, saving }) { return <form className="task-form" onSubmit={onSubmit}><label>任务标题<input autoFocus required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="要完成什么？"/></label><label>详细说明<textarea rows="5" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="背景、验收标准和注意事项…"/></label><div className="form-grid"><label>负责人<select value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })}><option value="">暂不分派</option>{profiles.map((p) => <option key={p.name}>{p.name}</option>)}</select></label><label>优先级<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="0">普通</option><option value="1">较高</option><option value="2">高</option><option value="3">紧急</option></select></label></div><label>项目路径<input value={form.workspace_path} onChange={(e) => setForm({ ...form, workspace_path: e.target.value })}/></label><label className="check"><input type="checkbox" checked={form.triage} onChange={(e) => setForm({ ...form, triage: e.target.checked })}/>先放入待分诊</label><div className="form-actions"><button type="button" className="secondary-button" onClick={onCancel}>取消</button><button className="primary-button" disabled={saving}>{saving && <Loader2 className="spin" size={15}/>}创建任务</button></div></form>; }
+function TaskForm({ form, setForm, profiles, tasks, onSubmit, onCancel, saving }) { return <form className="task-form" onSubmit={onSubmit}><label>任务标题<input autoFocus required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="要完成什么？"/></label><label>详细说明<textarea rows="5" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="背景、验收标准和注意事项…"/></label><div className="form-grid"><label>负责人<select value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })}><option value="">暂不分派</option>{profiles.map((p) => <option key={p.name}>{p.name}</option>)}</select></label><label>优先级<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="0">普通</option><option value="1">较高</option><option value="2">高</option><option value="3">紧急</option></select></label></div><label>前置任务 <span className="field-hint">可多选；全部完成后当前任务才会进入就绪</span><select className="parent-select" multiple value={form.parents} onChange={(e) => setForm({ ...form, parents: [...e.target.selectedOptions].map((option) => option.value) })}>{tasks.filter((task) => task.status !== 'archived').map((task) => <option key={task.id} value={task.id}>{statusLabel(task.status)} · {task.title}</option>)}</select></label><label>项目路径<input value={form.workspace_path} onChange={(e) => setForm({ ...form, workspace_path: e.target.value })}/></label><label className="check"><input type="checkbox" checked={form.triage} onChange={(e) => setForm({ ...form, triage: e.target.checked })}/>先放入待分诊</label><div className="form-actions"><button type="button" className="secondary-button" onClick={onCancel}>取消</button><button className="primary-button" disabled={saving}>{saving && <Loader2 className="spin" size={15}/>}创建任务</button></div></form>; }
 
 function Drawer({ detail, log, tasks, profiles, boardName, comment, setComment, linkId, setLinkId, saving, onClose, mutate }) {
   if (!detail) return <aside className="drawer"><div className="loading"><Loader2 className="spin"/>加载任务…</div></aside>;

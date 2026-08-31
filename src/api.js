@@ -14,6 +14,16 @@ export function dependencyPayload(parentId, childId) {
   return { parent_id: parentId, child_id: childId };
 }
 
+export function buildCreateTaskPayload(form) {
+  return {
+    ...form,
+    title: String(form.title || '').trim(),
+    priority: Number(form.priority || 0),
+    assignee: form.assignee || null,
+    parents: Array.isArray(form.parents) ? form.parents : [],
+  };
+}
+
 export function normalizeBoard(data = {}) {
   const columns = Object.fromEntries(STATUSES.map((status) => [status, []]));
   if (Array.isArray(data.columns)) {
