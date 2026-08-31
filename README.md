@@ -1,4 +1,5 @@
 # Hermes Kanban UI
+(by GPT 5.6 Sol)
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
