@@ -1,12 +1,14 @@
 # Hermes Kanban UI
 
-独立的 Hermes 看板界面，仅挂载 Kanban API，不暴露 Hermes 主仪表盘、模型、密钥或配置界面。
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
-## 界面预览
+A standalone Kanban interface for Hermes Agent. It exposes only the Kanban API and does not expose the main Hermes dashboard, models, secrets, or configuration pages.
 
-![Hermes Kanban UI 界面截图](./screenshot.png)
+## Preview
 
-## 运行
+![Hermes Kanban UI screenshot](./screenshot.png)
+
+## Run
 
 ```bash
 npm test
@@ -15,10 +17,10 @@ npm start
 # http://127.0.0.1:8002
 ```
 
-默认绑定 `127.0.0.1`，未提供应用层登录。需要远程访问时，请使用带身份验证的私有隧道（Tailscale/SSH tunnel 等），不要直接暴露公网。
+The server binds to `127.0.0.1` by default and does not provide application-level authentication. For remote access, use a private authenticated tunnel such as Tailscale or an SSH tunnel. Do not expose it directly to the public internet.
 
-环境变量：
+Environment variables:
 
-- `HERMES_SOURCE`：Hermes 源码路径，默认 `/home/agent/hermes`
-- `HOST`：监听地址，默认 `127.0.0.1`
-- `PORT`：监听端口，默认 `8002`
+- `HERMES_SOURCE`: Path to the Hermes source tree. Defaults to `/home/agent/hermes`.
+- `HOST`: Listening address. Defaults to `127.0.0.1`.
+- `PORT`: Listening port. Defaults to `8002`.
