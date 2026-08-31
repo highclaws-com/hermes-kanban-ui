@@ -2,6 +2,10 @@
 
 独立的 Hermes 看板界面，仅挂载 Kanban API，不暴露 Hermes 主仪表盘、模型、密钥或配置界面。
 
+## 界面预览
+
+![Hermes Kanban UI 界面截图](./screenshot.png)
+
 ## 运行
 
 ```bash
