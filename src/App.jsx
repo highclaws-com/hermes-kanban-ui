@@ -8,11 +8,11 @@ import { api, buildCreateTaskPayload, normalizeBoard } from './api.js';
 import { STATUSES, statusLabel } from './status.js';
 
 const iconByStatus = { triage: CircleDot, todo: Clock3, scheduled: CalendarClock, ready: ArrowRight, running: Activity, blocked: AlertCircle, review: Search, done: Check };
-const initialForm = { title: '', body: '', assignee: '', priority: 0, workspace_kind: 'dir', workspace_path: '/worktrees/folder-1/vibe-kanban-src', parents: [], triage: false };
+const initialForm = { title: '', body: '', assignee: '', priority: 0, workspace_kind: 'dir', workspace_path: '/worktrees/folder-1', parents: [], triage: false };
 const displayTime = (epoch) => epoch ? new Date(epoch * 1000).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 function App() {
-  const [boardName, setBoardName] = useState(localStorage.getItem('hermes-kanban-board') || 'vibe-kanban-source');
+  const [boardName, setBoardName] = useState(localStorage.getItem('hermes-kanban-board') || 'hermes-kanban');
   const [boards, setBoards] = useState([]);
   const [board, setBoard] = useState(() => normalizeBoard());
   const [profiles, setProfiles] = useState([]);

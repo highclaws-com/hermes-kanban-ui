@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { apiPath, buildCreateTaskPayload, dependencyPayload, normalizeBoard } from './api.js';
 describe('API helpers', () => {
-  it('adds board query safely', () => expect(apiPath('/board','vibe-kanban-source')).toBe('/api/board?board=vibe-kanban-source'));
+  it('adds board query safely', () => expect(apiPath('/board','hermes-kanban')).toBe('/api/board?board=hermes-kanban'));
   it('builds parent-child dependency direction', () => expect(dependencyPayload('parent','child')).toEqual({parent_id:'parent',child_id:'child'}));
   it('normalizes board columns', () => {
     const b=normalizeBoard({columns:{ready:[{id:'1'}]},tasks:[]});
