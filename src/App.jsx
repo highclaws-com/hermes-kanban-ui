@@ -117,7 +117,7 @@ function Column({ status, tasks, onOpen, onCreate }) {
 }
 
 function TaskCard({ task, onClick }) {
-  return <button className="task-card" onClick={onClick}><div className="card-top"><span className={`priority p-${Math.min(3, Math.max(0, task.priority || 0))}`}>{task.priority > 1 ? '高优先级' : task.tenant || '任务'}</span>{task.status === 'running' && <Loader2 size={14} className="spin"/>}</div><h3>{task.title}</h3>{(task.latest_summary || task.body) && <p>{task.latest_summary || task.body}</p>}<footer><span><UserRound size={13}/>{task.assignee || '未分派'}</span><span className="card-metrics">{task.link_counts?.parents > 0 && <i><GitBranch size={13}/>{task.link_counts.parents}</i>}{task.comment_count > 0 && <i><MessageSquare size={13}/>{task.comment_count}</i>}</span></footer></button>;
+  return <button className="task-card" onClick={onClick}><div className="card-top"><span className={`priority p-${Math.min(3, Math.max(0, task.priority || 0))}`}>{task.priority > 1 ? '高优先级' : task.tenant || '任务'}</span>{task.status === 'running' && <Loader2 size={14} className="spin"/>}</div><h3>{task.title}</h3><footer><span><UserRound size={13}/>{task.assignee || '未分派'}</span><span className="card-metrics">{task.link_counts?.parents > 0 && <i><GitBranch size={13}/>{task.link_counts.parents}</i>}{task.comment_count > 0 && <i><MessageSquare size={13}/>{task.comment_count}</i>}</span></footer></button>;
 }
 
 function Modal({ title, children, onClose }) { return <div className="modal-backdrop" onMouseDown={onClose}><section className="modal" onMouseDown={(e) => e.stopPropagation()}><header><h2>{title}</h2><button onClick={onClose}><X size={19}/></button></header>{children}</section></div>; }
