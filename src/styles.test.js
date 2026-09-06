@@ -22,4 +22,11 @@ describe('Kanban horizontal scrolling', () => {
     expect(rule('.app-shell')).toContain('min-width:100%');
     expect(rule('.topbar')).toContain('width:100%');
   });
+
+  it('keeps every board column bounded so card text wraps instead of widening the canvas', () => {
+    expect(rule('.kanban')).toContain('grid-template-columns:repeat(8,265px)');
+    expect(rule('.kanban')).not.toContain('1fr');
+    expect(rule('.column')).toContain('max-width:265px');
+    expect(rule('.task-card h3')).toContain('overflow-wrap:anywhere');
+  });
 });
