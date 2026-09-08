@@ -21,9 +21,11 @@ cd /worktrees/folder-1/hermes-kanban-ui
 npm ci
 npm test
 npm run build
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 HERMES_SOURCE=/home/agent/hermes \
 HERMES_KANBAN_BOARD=hermes-kanban \
-npm start
+.venv/bin/python -m uvicorn backend:app --host 127.0.0.1 --port 8002
 
 curl -fsS http://127.0.0.1:8002/api/health
 ```
@@ -58,3 +60,7 @@ curl -H "Authorization: Bearer $API_SERVER_KEY" \
 - `HOME` / `HERMES_HOME`：指定要复用的 Hermes 安装和 Profile
 - `HOST`：监听地址，默认 `127.0.0.1`
 - `PORT`：监听端口，默认 `8002`
+
+必须安装 `PyYAML`：导入的 Hermes Kanban 后端在计算任务诊断信息时会读取
+Hermes YAML 配置。请安装完整的 `requirements.txt`；如果只安装 FastAPI 和
+Uvicorn，`/api/board` 会返回 HTTP 500。

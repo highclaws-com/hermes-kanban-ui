@@ -22,9 +22,11 @@ cd /worktrees/folder-1/hermes-kanban-ui
 npm ci
 npm test
 npm run build
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 HERMES_SOURCE=/home/agent/hermes \
 HERMES_KANBAN_BOARD=hermes-kanban \
-npm start
+.venv/bin/python -m uvicorn backend:app --host 127.0.0.1 --port 8002
 
 curl -fsS http://127.0.0.1:8002/api/health
 ```
@@ -59,3 +61,8 @@ Environment variables:
 - `HOME` / `HERMES_HOME`: Select the Hermes installation and profiles to reuse.
 - `HOST`: Listening address. Defaults to `127.0.0.1`.
 - `PORT`: Listening port. Defaults to `8002`.
+
+`PyYAML` is required because the imported Hermes Kanban dashboard reads the
+Hermes YAML configuration while computing task diagnostics. Install the full
+`requirements.txt`; installing only FastAPI and Uvicorn causes `/api/board` to
+return HTTP 500.
