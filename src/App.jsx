@@ -4,7 +4,7 @@ import {
   CircleDot, Clock3, GitBranch, Link2, Loader2, MessageSquare, Plus, RefreshCw,
   Search, Send, Settings2, Sparkles, UserRound, X,
 } from 'lucide-react';
-import { api, buildCreateTaskPayload, normalizeBoard } from './api.js';
+import { api, buildCreateTaskPayload, normalizeBoard, resolveBoardName } from './api.js';
 import { STATUSES, statusLabel } from './status.js';
 
 const iconByStatus = { triage: CircleDot, todo: Clock3, scheduled: CalendarClock, ready: ArrowRight, running: Activity, blocked: AlertCircle, review: Search, done: Check };
@@ -12,7 +12,7 @@ const initialForm = { title: '', body: '', assignee: '', priority: 0, workspace_
 const displayTime = (epoch) => epoch ? new Date(epoch * 1000).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 function App() {
-  const [boardName, setBoardName] = useState(localStorage.getItem('hermes-kanban-board') || 'hermes-kanban');
+  const [boardName, setBoardName] = useState('');
   const [boards, setBoards] = useState([]);
   const [board, setBoard] = useState(() => normalizeBoard());
   const [profiles, setProfiles] = useState([]);
@@ -46,7 +46,9 @@ function App() {
 
   const loadMeta = useCallback(async () => {
     const [boardData, profileData] = await Promise.all([api.boards().catch(() => ({ boards: [] })), api.profiles().catch(() => ({ profiles: [] }))]);
-    setBoards(boardData.boards || []); setProfiles(profileData.profiles || []);
+    const availableBoards = boardData.boards || [];
+    const initialBoard = resolveBoardName(localStorage.getItem('hermes-kanban-board'), availableBoards, boardData.current);
+    setBoards(availableBoards); setProfiles(profileData.profiles || []); setBoardName(initialBoard);
   }, []);
 
   const loadDetail = useCallback(async (id) => {
@@ -57,7 +59,8 @@ function App() {
     } catch (e) { setError(e.message); }
   }, [boardName]);
 
-  useEffect(() => { localStorage.setItem('hermes-kanban-board', boardName); loadMeta(); loadBoard(); }, [boardName, loadBoard, loadMeta]);
+  useEffect(() => { loadMeta(); }, [loadMeta]);
+  useEffect(() => { if (boardName) { localStorage.setItem('hermes-kanban-board', boardName); loadBoard(); } }, [boardName, loadBoard]);
   useEffect(() => { if (selectedId) loadDetail(selectedId); else { setDetail(null); setLog(''); } }, [selectedId, loadDetail]);
   useEffect(() => { const timer = window.setInterval(() => { loadBoard(true); if (selectedId) loadDetail(selectedId); }, 5000); return () => clearInterval(timer); }, [loadBoard, loadDetail, selectedId]);
 

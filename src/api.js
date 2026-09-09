@@ -24,6 +24,13 @@ export function buildCreateTaskPayload(form) {
   };
 }
 
+export function resolveBoardName(storedBoard, boards = [], currentBoard) {
+  const slugs = boards.map((board) => board?.slug).filter(Boolean);
+  if (storedBoard && slugs.includes(storedBoard)) return storedBoard;
+  if (currentBoard && slugs.includes(currentBoard)) return currentBoard;
+  return slugs[0] || '';
+}
+
 export function normalizeBoard(data = {}) {
   const columns = Object.fromEntries(STATUSES.map((status) => [status, []]));
   if (Array.isArray(data.columns)) {
