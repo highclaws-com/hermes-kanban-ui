@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertCircle, ArrowRight, Bot, CalendarClock, Check, ChevronDown,
-  CircleDot, Clock3, Flag, GitBranch, Link2, Loader2, MessageSquare, Plus, RefreshCw,
-  Search, Send, Settings2, Sparkles, UserRound, X,
+  Activity, AlertCircle, ArrowDown, ArrowRight, Bot, CalendarClock, Check, ChevronDown,
+  CircleDot, Clock3, Copy, Flag, GitBranch, Link2, Loader2, Maximize2, MessageSquare, Minimize2,
+  Plus, RefreshCw, Search, Send, Settings2, Sparkles, Terminal, UserRound, WrapText, X,
 } from 'lucide-react';
 import { api, buildCreateTaskPayload, normalizeBoard, resolveBoardName } from './api.js';
+import { splitLog } from './log.js';
 import { STATUSES, statusLabel } from './status.js';
 
 const iconByStatus = { triage: CircleDot, todo: Clock3, scheduled: CalendarClock, ready: ArrowRight, running: Activity, blocked: AlertCircle, review: Search, done: Check };
@@ -279,9 +280,39 @@ function TaskForm({ form, setForm, profiles, tasks, onSubmit, onCancel, saving }
   </form>;
 }
 
+const DRAWER_TABS = [
+  { id: 'details', label: '详情', Icon: Settings2 },
+  { id: 'run', label: '运行', Icon: Terminal },
+  { id: 'comments', label: '评论', Icon: MessageSquare },
+];
+
+// Per-viewer preference persisted in localStorage (tolerates blocked storage).
+function useStoredState(key, fallback) {
+  const [value, setValue] = useState(() => {
+    try { const raw = localStorage.getItem(key); return raw === null ? fallback : JSON.parse(raw); } catch { return fallback; }
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } }, [key, value]);
+  return [value, setValue];
+}
+
 function Drawer({ detail, log, tasks, profiles, boardName, comment, setComment, linkId, setLinkId, saving, onClose, onOpen, mutate }) {
-  if (!detail) return <><div className="drawer-shade" onClick={onClose}/><aside className="drawer"><div className="loading"><Loader2 className="spin"/>加载任务…</div></aside></>;
+  const [tab, setTab] = useStoredState('hermes-drawer-tab', 'details');
+  const [wide, setWide] = useStoredState('hermes-drawer-wide', false);
+  // Lock the page behind the drawer so touch scrolling never leaks to the board.
+  useEffect(() => {
+    document.body.classList.add('drawer-open');
+    return () => document.body.classList.remove('drawer-open');
+  }, []);
+
+  const shell = (content) => <>
+    <div className="drawer-shade" onClick={onClose}/>
+    <aside className={`drawer ${wide ? 'wide' : ''}`} aria-label="任务详情">{content}</aside>
+  </>;
+  if (!detail) return shell(<div className="loading"><Loader2 className="spin"/>加载任务…</div>);
+
   const task = detail.task;
+  const formId = `task-form-${task.id}`;
+  const liveRun = detail.runs.some((run) => !run.ended_at);
   const saveFields = (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -290,29 +321,33 @@ function Drawer({ detail, log, tasks, profiles, boardName, comment, setComment, 
   const move = (status) => mutate(() => api.updateTask(task.id, { status }, boardName), `已移动到${statusLabel(status)}`);
   const addComment = (event) => { event.preventDefault(); if (!comment.trim()) return; mutate(() => api.comment(task.id, comment.trim(), boardName), '评论已添加'); setComment(''); };
   const addLink = (event) => { event.preventDefault(); if (!linkId) return; mutate(() => api.addLink(linkId, task.id, boardName), '依赖已添加'); setLinkId(''); };
+  const badge = { run: detail.runs.length || null, comments: detail.comments.length || null };
 
-  return <>
-    <div className="drawer-shade" onClick={onClose}/>
-    <aside className="drawer" aria-label="任务详情">
-      <header className="drawer-head">
-        <div><span className={`status-chip status-${task.status}`}>{statusLabel(task.status)}</span><code>{task.id}</code></div>
+  return shell(<>
+    <header className="drawer-head">
+      <div><span className={`status-chip status-${task.status}`}>{statusLabel(task.status)}</span><code>{task.id}</code></div>
+      <div>
+        <button className="drawer-widen" aria-label={wide ? '收起抽屉' : '展开抽屉'} title={wide ? '收起' : '展开'} onClick={() => setWide(!wide)}>{wide ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button>
         <button aria-label="关闭" onClick={onClose}><X size={20}/></button>
-      </header>
-      <div className="drawer-scroll">
-        {/* key resets the uncontrolled inputs when another task is opened */}
-        <form className="edit-form" key={task.id} onSubmit={saveFields}>
+      </div>
+    </header>
+    <nav className="drawer-tabs" role="tablist">
+      {DRAWER_TABS.map(({ id, label, Icon }) => <button key={id} role="tab" aria-selected={tab === id} className="drawer-tab" onClick={() => setTab(id)}>
+        <Icon size={16}/>{label}{id === 'run' && liveRun ? <span className="live-dot active"/> : badge[id] && <span className="tab-badge">{badge[id]}</span>}
+      </button>)}
+    </nav>
+
+    {/* Panels stay mounted (only hidden) so each keeps its own scroll position; key resets the
+        uncontrolled inputs when another task is opened. Inputs in other panels join the form via form={formId}. */}
+    <div className="drawer-panels" key={task.id}>
+      <section className="drawer-panel" role="tabpanel" hidden={tab !== 'details'}>
+        <form className="edit-form" id={formId} onSubmit={saveFields}>
           <input className="title-input" name="title" aria-label="任务标题" defaultValue={task.title}/>
-          <textarea className="body-input" name="body" rows="5" aria-label="任务说明" defaultValue={task.body || ''} placeholder="添加任务说明…"/>
           <div className="property-grid">
             <label><span><UserRound size={14}/>负责人</span><select name="assignee" defaultValue={task.assignee || ''}><option value="">未分派</option>{profiles.map((p) => <option key={p.name}>{p.name}</option>)}</select></label>
-            <label><span><Settings2 size={14}/>优先级</span><PrioritySelect name="priority" defaultValue={clampPriority(task.priority)}/></label>
+            <label><span><Flag size={14}/>优先级</span><PrioritySelect name="priority" defaultValue={clampPriority(task.priority)}/></label>
             <label><span><Clock3 size={14}/>创建时间</span><b>{displayTime(task.created_at)}</b></label>
             <label><span><Bot size={14}/>工作区</span><b title={task.workspace_path}>{task.workspace_kind || 'scratch'}</b></label>
-            <label className="full-row"><span><Sparkles size={14}/>加载技能</span>
-              <b>{task.skills?.length
-                ? <span className="skill-list">{task.skills.map((s) => <span className="skill-tag" key={s}>{s}</span>)}</span>
-                : <span className="muted skill-empty">无预加载技能（使用默认 kanban-worker）</span>}</b>
-            </label>
           </div>
           <button className="secondary-button save-button" disabled={saving}>{saving && <Loader2 className="spin" size={14}/>}保存修改</button>
         </form>
@@ -338,35 +373,103 @@ function Drawer({ detail, log, tasks, profiles, boardName, comment, setComment, 
             <button aria-label="添加依赖"><Plus size={16}/></button>
           </form>
         </section>
+      </section>
 
-        <section className="drawer-section">
-          <h3><MessageSquare size={16}/>评论 <span>{detail.comments.length}</span></h3>
-          <div className="comments">
-            {detail.comments.map((item) => <div className="comment-item" key={item.id}>
-              <Avatar name={item.author} size={26}/>
-              <div><div className="comment-meta"><b>{item.author}</b><time>{displayTime(item.created_at)}</time></div><p>{item.body}</p></div>
-            </div>)}
-            {!detail.comments.length && <p className="muted">还没有评论。</p>}
-          </div>
-          <form className="comment-form" onSubmit={addComment}>
-            <textarea rows="3" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="写下进展、问题或决定…"/>
-            <button className="primary-button"><Send size={15}/>发送</button>
-          </form>
-        </section>
+      <section className="drawer-panel run-panel" role="tabpanel" hidden={tab !== 'run'}>
+        <PromptCard task={task} formId={formId} saving={saving} startOpen={!detail.runs.length}/>
+        <RunsCard runs={detail.runs} fallbackProfile={task.assignee}/>
+        <LogViewer log={log} active={tab === 'run'} live={liveRun || task.status === 'running'}/>
+      </section>
 
-        <section className="drawer-section">
-          <h3><Activity size={16}/>运行记录 <span>{detail.runs.length}</span></h3>
-          {detail.runs.map((run) => <div className="run-row" key={run.id}>
-            <span className={`live-dot ${!run.ended_at ? 'active' : ''}`}/>
-            <div><b>{run.profile || task.assignee || 'worker'}</b><p>{run.summary || run.outcome || run.status}</p></div>
-            <time>{displayTime(run.started_at)}</time>
+      <section className="drawer-panel" role="tabpanel" hidden={tab !== 'comments'}>
+        <div className="comments">
+          {detail.comments.map((item) => <div className="comment-item" key={item.id}>
+            <Avatar name={item.author} size={26}/>
+            <div><div className="comment-meta"><b>{item.author}</b><time>{displayTime(item.created_at)}</time></div><p>{item.body}</p></div>
           </div>)}
-          {log && <pre className="worker-log">{log}</pre>}
-          {!detail.runs.length && !log && <p className="muted">暂无工作进程日志。</p>}
-        </section>
+          {!detail.comments.length && <p className="muted">还没有评论。</p>}
+        </div>
+        <form className="comment-form" onSubmit={addComment}>
+          <textarea rows="3" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="写下进展、问题或决定…"/>
+          <button className="primary-button"><Send size={15}/>发送</button>
+        </form>
+      </section>
+    </div>
+  </>);
+}
+
+function PromptCard({ task, formId, saving, startOpen }) {
+  const [open, setOpen] = useState(startOpen);
+  const preview = (task.body || '').trim().split('\n')[0];
+  return <details className="run-card prompt-card" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <summary><Sparkles size={15}/><b>任务指令</b><span className="summary-hint">{preview || '未填写'}</span><ChevronDown size={16} className="summary-caret"/></summary>
+    <div className="run-card-body">
+      <textarea className="prompt-input" name="body" form={formId} rows="8" aria-label="任务指令" defaultValue={task.body || ''} placeholder="描述要智能体完成的工作、背景和验收标准…"/>
+      <div className="prompt-meta">
+        <span>技能</span>
+        {task.skills?.length
+          ? <span className="skill-list">{task.skills.map((s) => <span className="skill-tag" key={s}>{s}</span>)}</span>
+          : <span className="muted skill-empty">无预加载技能（使用默认 kanban-worker）</span>}
       </div>
-    </aside>
-  </>;
+      {task.workspace_path && <div className="prompt-meta"><span>路径</span><code>{task.workspace_path}</code></div>}
+      <button type="submit" form={formId} className="secondary-button save-button" disabled={saving}>{saving && <Loader2 className="spin" size={14}/>}保存指令</button>
+    </div>
+  </details>;
+}
+
+function RunsCard({ runs, fallbackProfile }) {
+  if (!runs.length) return null;
+  const latest = runs[runs.length - 1];
+  const row = (run) => <div className="run-row" key={run.id}>
+    <span className={`live-dot ${!run.ended_at ? 'active' : ''}`}/>
+    <div><b>{run.profile || fallbackProfile || 'worker'}</b><p>{run.summary || run.outcome || run.status}</p></div>
+    <time>{displayTime(run.started_at)}</time>
+  </div>;
+  return <details className="run-card runs-card">
+    <summary><Activity size={15}/><b>运行记录</b><span className="tab-badge">{runs.length}</span><span className="summary-hint">{latest.summary || latest.outcome || latest.status}</span><ChevronDown size={16} className="summary-caret"/></summary>
+    <div className="run-card-body runs-list">{[...runs].reverse().map(row)}</div>
+  </details>;
+}
+
+const LOG_SIZES = [11, 12, 13, 14, 16, 18];
+
+function LogViewer({ log, active, live }) {
+  const viewRef = useRef(null);
+  const [follow, setFollow] = useState(true);
+  const [wrap, setWrap] = useStoredState('hermes-log-wrap', true);
+  const [size, setSize] = useStoredState('hermes-log-size', 13);
+  const [copied, setCopied] = useState(false);
+  const lines = useMemo(() => splitLog(log), [log]);
+  const rendered = useMemo(() => lines.map((line, index) => <div key={index} className={`log-line ${line.kind}`}>{line.text || ' '}</div>), [lines]);
+  const sizeIndex = Math.max(0, LOG_SIZES.indexOf(size));
+
+  const toBottom = (smooth) => { const el = viewRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); };
+  // Stick to the newest output while following; leave the position alone once the reader scrolls up.
+  useLayoutEffect(() => { if (active && follow) toBottom(false); }, [rendered, active, follow, wrap, size]);
+  const onScroll = () => {
+    const el = viewRef.current;
+    setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 32);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(log); setCopied(true); window.setTimeout(() => setCopied(false), 1500); } catch { /* clipboard unavailable */ }
+  };
+
+  return <div className="log-shell">
+    <div className="log-toolbar">
+      <span className="log-title"><Terminal size={15}/>工作日志{live && <span className="live-dot active"/>}</span>
+      <span className="log-count">{lines.length} 行</span>
+      <div className="log-tools">
+        <button aria-label="缩小字号" title="缩小字号" disabled={sizeIndex === 0} onClick={() => setSize(LOG_SIZES[sizeIndex - 1])}>A−</button>
+        <button aria-label="放大字号" title="放大字号" disabled={sizeIndex === LOG_SIZES.length - 1} onClick={() => setSize(LOG_SIZES[sizeIndex + 1])}>A+</button>
+        <button aria-label="自动换行" title="自动换行" aria-pressed={wrap} onClick={() => setWrap(!wrap)}><WrapText size={16}/></button>
+        <button aria-label="复制日志" title="复制日志" disabled={!log} onClick={copy}>{copied ? <Check size={16}/> : <Copy size={16}/>}</button>
+      </div>
+    </div>
+    <div ref={viewRef} className={`log-view ${wrap ? '' : 'nowrap'}`} style={{ '--log-size': `${size}px` }} onScroll={onScroll} tabIndex={0} aria-label="工作日志内容">
+      {lines.length ? rendered : <div className="log-empty"><Terminal size={22}/>暂无日志输出</div>}
+    </div>
+    {!follow && lines.length > 0 && <button className="log-jump" onClick={() => { setFollow(true); toBottom(true); }}><ArrowDown size={15}/>最新</button>}
+  </div>;
 }
 
 export default App;
